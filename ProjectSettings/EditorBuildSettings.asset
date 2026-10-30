@@ -26,6 +26,9 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/XRClassroom.unity
     guid: 67bf18ac292b012469ece9c5bc9b23db
+  - enabled: 1
+    path: Assets/Scenes/XRClassroom_Meta.unity
+    guid: 89c9ccd7b705452b9ce0970f15436049
   m_configObjects:
     com.unity.xr.arfoundation.simulation_settings: {fileID: 11400000, guid: 33491290b38a6094fbf61d3c24a308a5,
       type: 2}
