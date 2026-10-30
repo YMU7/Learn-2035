@@ -28,6 +28,10 @@ namespace XRClassroom.EditorTools
         const string k_OVRCameraRigGuid = "126d619cf4daa52469682f85c1378b4a";
         const string k_OVRInteractionComprehensiveGuid = "0a7d2469f24041c4284c66706f84c45e";
 
+        // Assets/VRMPAssets/Prefabs/UIPrefabs/Player_Notification_UI.prefab. It normally lives inside the XRI rig,
+        // but only needs Camera.main, so the Meta scene gets its own copy at the scene root.
+        const string k_PlayerNotificationUIGuid = "124729d69b3904f678772dd7681f3a87";
+
         const string k_LogPrefix = "[MetaRigConverter]";
 
         [MenuItem(k_MenuPath)]
@@ -62,6 +66,7 @@ namespace XRClassroom.EditorTools
             OVRCameraRig cameraRig = FindOrCreateCameraRig(spawnPose);
             FindOrCreateInteractionRig(cameraRig);
             DisableDuplicateHandVisuals(cameraRig);
+            EnsurePlayerNotificationUI();
 
             Undo.CollapseUndoOperations(undoGroup);
             EditorSceneManager.MarkSceneDirty(scene);
@@ -194,6 +199,24 @@ namespace XRClassroom.EditorTools
                     skinnedMeshRenderer.enabled = false;
                 }
             }
+        }
+
+        /// <summary>
+        /// PlayerHudNotification.Instance is used by networking and voice chat scripts (e.g. VoiceChatManager).
+        /// Its only copy was inside the deactivated XRI rig, so add one at the scene root if no active copy exists.
+        /// </summary>
+        static void EnsurePlayerNotificationUI()
+        {
+            bool hasActiveHud = Object.FindObjectsByType<XRMultiplayer.PlayerHudNotification>(
+                FindObjectsInactive.Exclude, FindObjectsSortMode.None).Length > 0;
+            if (hasActiveHud)
+            {
+                Debug.Log($"{k_LogPrefix} Active PlayerHudNotification found, not adding another.");
+                return;
+            }
+
+            GameObject instance = InstantiatePrefab(k_PlayerNotificationUIGuid, null);
+            Debug.Log($"{k_LogPrefix} Added Player_Notification_UI at the scene root (the XRI rig copy is inactive).", instance);
         }
 
         static void DisableIfPresent<T>(Component owner) where T : Behaviour
