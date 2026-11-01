@@ -956,11 +956,11 @@ PlayerSettings:
   captureStartupLogs: {}
   activeInputHandler: 1
   windowsGamepadBackendHint: 0
-  cloudProjectId: 05eba588-47a1-406a-b314-32f36ab8a57d
+  cloudProjectId: 6661f080-4405-42be-9404-c9f3874b1f87
   framebufferDepthMemorylessMode: 0
   qualitySettingsNames: []
-  projectName: XRClassroom2
-  organizationId: aubrey-simonson-as-publisher
+  projectName: XRClassroom2 (1)
+  organizationId: yaxin-mu
   cloudEnabled: 0
   legacyClampBlendShapeWeights: 0
   hmiLoadingImage: {fileID: 0}
