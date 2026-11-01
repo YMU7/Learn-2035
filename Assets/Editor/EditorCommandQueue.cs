@@ -17,8 +17,7 @@ namespace XRClassroom.EditorTools
     /// Commands:
     ///   refresh                              AssetDatabase.Refresh()
     ///   open-scene Assets/Scenes/Foo.unity   open a scene (refused if the current scene has unsaved changes)
-    ///   convert-meta-rig                     run MetaRigConverter on the active scene
-    ///   enable-openxr-feature MetaXRFeature  enable an OpenXR feature (by class name) for Android and Standalone
+    ///   enable-openxr-feature HandTracking   enable an OpenXR feature (by class name) for Android and Standalone
     ///   save                                 save open scenes and project assets
     ///   play 5                               enter Play mode, exit after N seconds
     /// </summary>
@@ -127,11 +126,6 @@ namespace XRClassroom.EditorTools
                         EditorSceneManager.OpenScene(argument, OpenSceneMode.Single);
                         Report($"open-scene: opened {argument}");
                     }
-                    break;
-
-                case "convert-meta-rig":
-                    bool converted = MetaRigConverter.Convert(interactive: false);
-                    Report(converted ? "convert-meta-rig: done" : "convert-meta-rig: refused (see Console)", !converted);
                     break;
 
                 case "enable-openxr-feature":
