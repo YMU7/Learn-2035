@@ -141,16 +141,27 @@ namespace XRMultiplayer
                         // loop through all sessions and check for available slots
                         foreach (var session in results.Sessions)
                         {
-                            if (session.AvailableSlots > 0)
+                            if (s_SkippedSessionIds.Contains(session.Id))
                             {
-                                await JoinLobby(session);
+                                // Ghost room: an earlier join failed or dropped us right away (see SkipSession).
+                                Utils.Log($"{k_DebugPrepend}Skipping session that failed before: {session.Name}");
+                                continue;
+                            }
+                            if (session.AvailableSlots <= 0)
+                            {
+                                Utils.Log($"{k_DebugPrepend}Skipping full session: {session.Name}");
+                                continue;
+                            }
+
+                            // Was: join the first open session and stop, even if the join failed, so a ghost room
+                            // blocked quick join forever. Now: on failure remember it and try the next / create one.
+                            if (await JoinLobby(session, reportFailure: false) != null)
+                            {
                                 createOwn = false;
                                 break;
                             }
-                            else
-                            {
-                                Utils.Log($"{k_DebugPrepend}Skipping full session: {session.Name}");
-                            }
+                            Utils.Log($"{k_DebugPrepend}Join failed, skipping session from now on: {session.Name}", 1);
+                            SkipSession(session.Id);
                         }
                     }
                     catch (Exception e)
@@ -177,8 +188,10 @@ namespace XRMultiplayer
         /// </summary>
         /// <param name="sessionInfo">Lobby to join.</param>
         /// <param name="roomCode">Lobby Code to join with.</param>
+        /// <param name="reportFailure">False when the caller handles failure itself (quick join tries the next session),
+        /// so OnSessionFailed does not reset the connection state in the middle of quick join.</param>
         /// <returns>Returns the Lobby.</returns>
-        public async Task<ISession> JoinLobby(ISessionInfo sessionInfo = null, string roomCode = null)
+        public async Task<ISession> JoinLobby(ISessionInfo sessionInfo = null, string roomCode = null, bool reportFailure = true)
         {
             try
             {
@@ -223,9 +236,25 @@ namespace XRMultiplayer
                         failureMessage = e.Message;
                 }
                 Utils.Log($"{k_DebugPrepend}{failureMessage}\n\n{e}", 1);
-                OnSessionFailed?.Invoke($"{failureMessage}");
+                if (reportFailure)
+                    OnSessionFailed?.Invoke($"{failureMessage}");
                 return null;
             }
+        }
+
+        /// <summary>
+        /// Session ids that quick join will not try again during this app run: joins that failed, or sessions that
+        /// dropped us right after connecting. These are "ghost rooms" whose players quit without leaving
+        /// (app killed, Play stopped). UGS hides such rooms from queries once their heartbeat stops, which can take a while.
+        /// Static so it survives the lobby / room scene switch.
+        /// </summary>
+        static readonly HashSet<string> s_SkippedSessionIds = new HashSet<string>();
+
+        /// <summary>Do not quick join this session again (see <see cref="s_SkippedSessionIds"/>).</summary>
+        public static void SkipSession(string sessionId)
+        {
+            if (!string.IsNullOrEmpty(sessionId))
+                s_SkippedSessionIds.Add(sessionId);
         }
 
         /// <summary>
@@ -323,17 +352,56 @@ namespace XRMultiplayer
             XRINetworkGameManager.ConnectedRoomName.Value = m_CurrentSession.Name;
         }
 
-        public async Task LeaveSession()
+        Task m_LeaveTask;
+
+        /// <summary>
+        /// Leaves the current session. If we are the session's (lobby) host and the only player left, the session is
+        /// deleted instead, so an empty room never stays listed. Otherwise UGS keeps the room and moves the host role
+        /// to a remaining player.
+        /// Re-entrant: a second call while a leave is running (e.g. Disconnect, then OnDestroy) waits for the same
+        /// leave instead of leaving twice ("SessionException: lobby not found").
+        /// </summary>
+        public Task LeaveSession()
         {
-            if (m_CurrentSession != null)
-            {
-                m_CurrentSession.SessionPropertiesChanged -= OnSessionPropertiesChanged;
-                await m_CurrentSession.LeaveAsync();
-                m_CurrentSession = null;
-            }
-            else
+            if (m_LeaveTask != null)
+                return m_LeaveTask;
+
+            if (m_CurrentSession == null)
             {
                 Utils.Log($"{k_DebugPrepend}Connected Lobby is null");
+                return Task.CompletedTask;
+            }
+
+            m_LeaveTask = LeaveOrDeleteSession(m_CurrentSession);
+            return m_LeaveTask;
+        }
+
+        async Task LeaveOrDeleteSession(ISession session)
+        {
+            session.SessionPropertiesChanged -= OnSessionPropertiesChanged;
+            try
+            {
+                // Trigger for deleting the room: we are the host AND player count <= 1 (only us).
+                if (session.IsHost && session.PlayerCount <= 1)
+                {
+                    Utils.Log($"{k_DebugPrepend}Last player in {session.Name}: deleting the session.");
+                    await session.AsHost().DeleteAsync();
+                }
+                else
+                {
+                    await session.LeaveAsync();
+                }
+            }
+            catch (Exception e)
+            {
+                // Session already gone (deleted by the service, or we were dropped): nothing left to leave.
+                Utils.Log($"{k_DebugPrepend}Leave session failed (ignored): {e.Message}", 1);
+            }
+            finally
+            {
+                if (m_CurrentSession == session)
+                    m_CurrentSession = null;
+                m_LeaveTask = null;
             }
         }
 

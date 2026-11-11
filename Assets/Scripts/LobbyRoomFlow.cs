@@ -17,6 +17,11 @@ namespace XRClassroom
     ///   networks meet through the UGS cloud (Distributed Authority), no shared Wi-Fi needed.
     /// - Room: when a connected player disconnects (Disconnect button or lost connection, i.e. ConnectionState
     ///   goes from Connected to anything else), they are sent back to the lobby.
+    /// - Room: failed joins are retried; a drop within k_EarlyDropWindow s of connecting marks the room as a ghost
+    ///   room (SessionManager.SkipSession) and joins again. The last player to leave deletes the room
+    ///   (SessionManager.LeaveSession).
+    /// - Editor: Play always starts in the lobby (Assets/Editor/PlayFromLobby.cs). Builds start there anyway
+    ///   (first enabled scene in Build Settings).
     ///
     /// Network authority: nothing here is networked. Each client loads scenes locally and joins the session on
     /// its own; the UGS session decides who is session owner (first player in; promoted if they leave).
@@ -43,6 +48,10 @@ namespace XRClassroom
         // creation occasionally fails on the service side ("No join code returned from lobby").
         const int k_MaxJoinRetries = 3;
         const float k_RetryDelay = 3f;
+        // Room: if we get dropped within this many seconds after connecting, without pressing Disconnect / Leave,
+        // the room is treated as a ghost room (its players quit without leaving): it is skipped from now on and we
+        // quick join again (counts as a retry) instead of returning to the lobby. Later drops return to the lobby.
+        const float k_EarlyDropWindow = 15f;
 
         const string k_LogPrefix = "[LobbyRoomFlow] ";
 
@@ -54,6 +63,8 @@ namespace XRClassroom
         bool m_SawConnecting;
         bool m_Leaving;
         int m_JoinRetries;
+        float m_ConnectedAt;
+        string m_ConnectedSessionId;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         static void Install()
@@ -82,6 +93,7 @@ namespace XRClassroom
 
             if (m_IsRoom)
             {
+                WatchRoomDisconnectButton();
                 XRINetworkGameManager.CurrentConnectionState.SubscribeAndUpdate(OnRoomConnectionState);
             }
             else
@@ -124,6 +136,22 @@ namespace XRClassroom
 
         // ---------- Room ----------
 
+        /// <summary>
+        /// The room's Disconnect button still calls XRINetworkGameManager.Disconnect (scene-serialized). We only add a
+        /// listener that marks the leave as intentional, so it is not mistaken for a ghost-room drop.
+        /// </summary>
+        void WatchRoomDisconnectButton()
+        {
+            var ui = FindFirstObjectByType<ConnectionUIController>(FindObjectsInactive.Include);
+            var button = ui != null && ui.DisconnectButton != null ? ui.DisconnectButton.GetComponentInChildren<UnityEngine.UI.Button>(true) : null;
+            if (button == null)
+            {
+                Debug.LogWarning($"{k_LogPrefix}No Disconnect button found in room; its leaves count as drops.");
+                return;
+            }
+            button.onClick.AddListener(() => m_Leaving = true);
+        }
+
         void OnRoomConnectionState(XRINetworkGameManager.ConnectionState state)
         {
             Debug.Log($"{k_LogPrefix}Room: connection state = {state}");
@@ -150,7 +178,24 @@ namespace XRClassroom
             if (state == XRINetworkGameManager.ConnectionState.Connected)
             {
                 m_WasConnected = true;
-                m_JoinRetries = 0;
+                m_ConnectedAt = Time.realtimeSinceStartup;
+                var session = XRINetworkGameManager.Instance != null ? XRINetworkGameManager.Instance.sessionManager.currentSession : null;
+                m_ConnectedSessionId = session?.Id;
+                Debug.Log($"{k_LogPrefix}Room: connected to '{session?.Name}' ({session?.PlayerCount} players).");
+                return;
+            }
+
+            // Trigger: dropped soon after connecting, not by Disconnect / Leave -> ghost room: skip it, rejoin.
+            if (k_AutoJoinInRoom && m_WasConnected && !m_Leaving && state != XRINetworkGameManager.ConnectionState.Connecting
+                && Time.realtimeSinceStartup - m_ConnectedAt < k_EarlyDropWindow && m_JoinRetries < k_MaxJoinRetries)
+            {
+                m_WasConnected = false;
+                m_SawConnecting = false;
+                m_JoinRetries++;
+                SessionManager.SkipSession(m_ConnectedSessionId);
+                Debug.Log($"{k_LogPrefix}Room: dropped {Time.realtimeSinceStartup - m_ConnectedAt:0.0} s after connecting; " +
+                          $"skipping that room, rejoin {m_JoinRetries}/{k_MaxJoinRetries}.");
+                StartCoroutine(RejoinAfterDrop());
                 return;
             }
 
@@ -196,6 +241,18 @@ namespace XRClassroom
                 XRINetworkGameManager.Instance.Disconnect(); // state change then returns us to the lobby
             else
                 SwitchScene(k_LobbyScene); // never connected: go back directly
+        }
+
+        IEnumerator RejoinAfterDrop()
+        {
+            // Leave the dropped session properly first (deletes it if we were its last player).
+            if (XRINetworkGameManager.Instance != null)
+                XRINetworkGameManager.Instance.Disconnect();
+            float waitUntil = Time.realtimeSinceStartup + k_ReturnToLobbyMaxWait;
+            while (Time.realtimeSinceStartup < waitUntil && XRINetworkGameManager.Instance != null
+                   && XRINetworkGameManager.Instance.sessionManager.currentSession != null)
+                yield return null;
+            yield return RetryJoinAfterDelay();
         }
 
         IEnumerator RetryJoinAfterDelay()

@@ -26,6 +26,9 @@ public class ConnectionUIController : MonoBehaviour
     /// <summary>The Join Online button. Read by XRClassroom.LobbyRoomFlow to repurpose it in the lobby scene.</summary>
     public Button JoinButton => joinButton;
 
+    /// <summary>The Disconnect button object. Read by XRClassroom.LobbyRoomFlow to tell intentional leaves from drops.</summary>
+    public GameObject DisconnectButton => disconnectButton;
+
     void OnEnable()
     {
         // Fires immediately with the current state, so the buttons start out correct.
