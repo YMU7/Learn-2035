@@ -283,7 +283,8 @@ namespace XRMultiplayer
                 SessionProperties = new Dictionary<string, SessionProperty>
                 {
                     { k_BuildIdKeyIdentifier, new SessionProperty(Application.version) },
-                    { k_SceneKeyIdentifier, new SessionProperty(SceneManager.GetActiveScene().name) },
+                    // Indexed as String1 so quick join can filter by scene (see GetQuickJoinFilterOptions).
+                    { k_SceneKeyIdentifier, new SessionProperty(SceneManager.GetActiveScene().name, VisibilityPropertyOptions.Public, PropertyIndex.String1) },
                     { k_EditorKeyIdentifier, new SessionProperty(hideEditorFromLobby.ToString()) }
                 },
                 IsPrivate = sessionType == SessionType.LocalOnly ? true : isPrivate,
@@ -338,7 +339,16 @@ namespace XRMultiplayer
 
         public static QuerySessionsOptions GetQuickJoinFilterOptions()
         {
-            QuerySessionsOptions options = new QuerySessionsOptions();
+            // Only list / quick-join sessions created in the same scene as ours (session property "s",
+            // indexed as String1 in GetSessionOptions). Without this, a player in DemoClass could land in a
+            // session that was created from another scene.
+            QuerySessionsOptions options = new QuerySessionsOptions
+            {
+                FilterOptions = new List<FilterOption>
+                {
+                    new FilterOption(FilterField.StringIndex1, SceneManager.GetActiveScene().name, FilterOperation.Equal)
+                }
+            };
             return options;
         }
 

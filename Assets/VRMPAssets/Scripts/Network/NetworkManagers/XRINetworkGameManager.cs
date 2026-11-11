@@ -108,6 +108,21 @@ namespace XRMultiplayer
         static BindableEnum<ConnectionState> m_ConnectionState = new BindableEnum<ConnectionState>(ConnectionState.None);
 
         /// <summary>
+        /// Replaces the static bindable variables with fresh instances (keeping name / color values).
+        /// Called by XRClassroom.LobbyRoomFlow right before switching scenes: several template scripts subscribe to
+        /// these statics and never unsubscribe, so without a reset their destroyed instances would still be
+        /// invoked (and throw) in the next scene. Must be called after the old scene's objects are destroyed.
+        /// </summary>
+        public static void ResetBindingsForSceneChange()
+        {
+            ConnectedRoomName = new BindableVariable<string>("");
+            LocalPlayerName = new BindableVariable<string>(LocalPlayerName.Value);
+            LocalPlayerColor = new BindableVariable<Color>(LocalPlayerColor.Value);
+            m_Connected = new BindableVariable<bool>(false);
+            m_ConnectionState = new BindableEnum<ConnectionState>(ConnectionState.None);
+        }
+
+        /// <summary>
         /// Returns the current session type.
         /// </summary>
         /// <remarks>

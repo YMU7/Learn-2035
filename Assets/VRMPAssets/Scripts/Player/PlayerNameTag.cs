@@ -62,6 +62,10 @@ namespace XRMultiplayer
 
         private void OnDestroy()
         {
+            // Name tags that were never bound to a player (e.g. the offline avatar's) have no m_Player.
+            // Without this guard, unloading the scene (lobby -> room switch) throws here.
+            if (m_Player == null) return;
+
             m_Player.onColorUpdated -= UpdateColor;
             m_Player.onNameUpdated -= UpdateName;
             m_Player.selfMuted.OnValueChanged -= UpdateSelfMutedState;

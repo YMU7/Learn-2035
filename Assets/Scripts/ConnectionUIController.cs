@@ -23,6 +23,9 @@ public class ConnectionUIController : MonoBehaviour
     [SerializeField] string joinText = "Join Online";
     [SerializeField] string connectingText = "Connecting...";
 
+    /// <summary>The Join Online button. Read by XRClassroom.LobbyRoomFlow to repurpose it in the lobby scene.</summary>
+    public Button JoinButton => joinButton;
+
     void OnEnable()
     {
         // Fires immediately with the current state, so the buttons start out correct.

@@ -83,6 +83,7 @@ namespace XRMultiplayer
             int layer = LayerMask.NameToLayer("Mirror");
             foreach (var r in m_HeadRends)
             {
+                if (r == null) continue; // unassigned slot on part-based avatars
                 r.gameObject.layer = layer;
                 r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
             }
@@ -90,16 +91,21 @@ namespace XRMultiplayer
 
         public virtual void PlayerSpawnedAll()
         {
+            if (m_HostVisuals == null) return;
             m_HostVisuals.SetActive(m_ShowHostVisuals && m_NetworkPlayer.NetworkObject.OwnerClientId == NetworkManager.Singleton.CurrentSessionOwner);
         }
 
         public virtual void SetPlayerColor(Color newColor)
         {
+            // The template head mesh had the color on material slot 2; part-based avatars may have no head
+            // renderer here or fewer slots, so skip instead of throwing during player setup.
+            if (m_headRend == null || m_headRend.sharedMaterials.Length <= 2) return;
             m_headRend.materials[2].SetColor("_BaseColor", newColor);
         }
 
         public virtual void HostUpdated(ulong newHostId)
         {
+            if (m_HostVisuals == null) return;
             m_HostVisuals.SetActive(m_ShowHostVisuals && m_NetworkPlayer.NetworkObject.OwnerClientId == newHostId);
         }
     }
@@ -124,13 +130,18 @@ public class LocalPlayerMaterialSwap
 
     public void SwapMaterials()
     {
-        for (int i = 0; i < hands.Length; i++)
+        // Part-based avatars leave some of these renderers unassigned (e.g. no HMD mesh). Skip missing ones
+        // instead of throwing: an exception here aborts XRINetworkPlayer.onSpawnedLocal for later listeners.
+        if (hands != null)
         {
-            hands[i].material = handMaterial;
+            for (int i = 0; i < hands.Length; i++)
+            {
+                if (hands[i] != null) hands[i].material = handMaterial;
+            }
         }
 
-        hmdRend.materials = hmdMaterials;
-        headRend.materials = headMaterials;
-        hostRend.material = hostMaterial;
+        if (hmdRend != null) hmdRend.materials = hmdMaterials;
+        if (headRend != null) headRend.materials = headMaterials;
+        if (hostRend != null) hostRend.material = hostMaterial;
     }
 }
