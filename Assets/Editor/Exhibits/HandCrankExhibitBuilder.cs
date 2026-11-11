@@ -159,9 +159,10 @@ namespace XRClassroom.EditorTools.Exhibits
             var glows = new System.Collections.Generic.List<Renderer>();
             string[] steps =
             {
-                "<b>1. MECHANICAL</b>\nYour arm turns the crank",
-                "<b>2. ELECTRICAL</b>\nThe spinning magnet pushes charges through the coils",
-                "<b>3. LIGHT</b>\nThe bulb glows",
+                // Labels only: the student works out how each turns into the next.
+                "<b>MECHANICAL</b>\nenergy",
+                "<b>ELECTRICAL</b>\nenergy",
+                "<b>LIGHT</b>\nenergy",
             };
             for (int i = 0; i < steps.Length; i++)
             {

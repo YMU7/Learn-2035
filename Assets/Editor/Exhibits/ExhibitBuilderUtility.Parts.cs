@@ -77,7 +77,6 @@ namespace XRClassroom.EditorTools.Exhibits
 
         // Control strip buttons (left to right) and their colours.
         static readonly Color k_HintColor = new Color(0.95f, 0.72f, 0.1f);
-        static readonly Color k_ChoiceColor = new Color(0.15f, 0.45f, 0.9f);
         static readonly Color k_NextColor = new Color(0.15f, 0.68f, 0.3f);
         static readonly Color k_ResetColor = new Color(0.85f, 0.12f, 0.1f);
 
@@ -291,37 +290,36 @@ namespace XRClassroom.EditorTools.Exhibits
         }
 
         /// <summary>
-        /// The step guide: title, question, answer choices, feedback and hint text on the backsplash, plus a
-        /// sloped control strip along the bench's front edge with Hint, A, B, C, Next and Reset buttons.
+        /// The step guide: title, open question, live observations and hint text on the backsplash, plus a
+        /// sloped control strip along the bench's front edge with Hint, Next and Reset buttons.
         /// </summary>
         public static ExhibitGuide Guide(Transform experiment, Transform exhibitRoot, SharedMaterials materials)
         {
             float z = 0.35f - 0.021f; // Just in front of the backsplash.
+            // Text boxes shrink their font to fit rather than overflowing into each other.
             var title = Label("Guide Title", experiment, new Vector3(0f, 0.54f, z), Quaternion.identity, "", 0.45f, new Vector2(1.5f, 0.07f), TextColor);
             title.fontStyle = FontStyles.Bold;
-            var prompt = Label("Guide Prompt", experiment, new Vector3(0f, 0.43f, z), Quaternion.identity, "", 0.34f, new Vector2(1.45f, 0.14f), TextColor);
-            var choices = Label("Guide Choices", experiment, new Vector3(0f, 0.32f, z), Quaternion.identity, "", 0.36f, new Vector2(1.45f, 0.06f),
-                new Color(0.1f, 0.3f, 0.7f));
-            choices.fontStyle = FontStyles.Bold;
-            var feedback = Label("Guide Feedback", experiment, new Vector3(0f, 0.22f, z), Quaternion.identity, "", 0.31f, new Vector2(1.45f, 0.14f),
+            var prompt = Label("Guide Prompt", experiment, new Vector3(0f, 0.43f, z), Quaternion.identity, "", 0.38f, new Vector2(1.45f, 0.16f), TextColor);
+            var feedback = Label("Guide Feedback", experiment, new Vector3(0f, 0.3f, z), Quaternion.identity, "", 0.32f, new Vector2(1.45f, 0.1f),
                 new Color(0.1f, 0.4f, 0.2f));
-            var hint = Label("Guide Hint", experiment, new Vector3(0f, 0.11f, z), Quaternion.identity, "", 0.28f, new Vector2(1.45f, 0.08f),
+            var hint = Label("Guide Hint", experiment, new Vector3(0f, 0.215f, z), Quaternion.identity, "", 0.28f, new Vector2(1.45f, 0.07f),
                 new Color(0.55f, 0.4f, 0.05f));
             hint.fontStyle = FontStyles.Italic;
+            foreach (var text in new[] { title, prompt, feedback, hint })
+            {
+                text.enableAutoSizing = true;
+                text.fontSizeMax = text.fontSize;
+                text.fontSizeMin = text.fontSize * 0.6f;
+                text.overflowMode = TextOverflowModes.Ellipsis;
+            }
 
             // The strip hangs off the bench's front edge, tilted toward the visitor.
             var strip = Empty("Control Strip", experiment, new Vector3(0f, -0.015f, -0.415f), Quaternion.Euler(-20f, 0f, 0f)).transform;
             Primitive(PrimitiveType.Cube, "Panel", strip, Vector3.zero, new Vector3(1.4f, 0.02f, 0.13f), materials.white);
 
-            var hintButton = PokeButton(strip, "Hint", new Vector3(-0.58f, 0.01f, 0.015f), k_HintColor, "Hint", materials);
-            var choiceButtons = new[]
-            {
-                PokeButton(strip, "Choice A", new Vector3(-0.27f, 0.01f, 0.015f), k_ChoiceColor, "A", materials),
-                PokeButton(strip, "Choice B", new Vector3(-0.12f, 0.01f, 0.015f), k_ChoiceColor, "B", materials),
-                PokeButton(strip, "Choice C", new Vector3(0.03f, 0.01f, 0.015f), k_ChoiceColor, "C", materials),
-            };
-            var nextButton = PokeButton(strip, "Next", new Vector3(0.32f, 0.01f, 0.015f), k_NextColor, "Next", materials);
-            var resetButton = PokeButton(strip, "Reset", new Vector3(0.58f, 0.01f, 0.015f), k_ResetColor, "Reset", materials);
+            var hintButton = PokeButton(strip, "Hint", new Vector3(-0.5f, 0.01f, 0.015f), k_HintColor, "Hint", materials);
+            var nextButton = PokeButton(strip, "Next", new Vector3(0.05f, 0.01f, 0.015f), k_NextColor, "Next", materials);
+            var resetButton = PokeButton(strip, "Reset", new Vector3(0.5f, 0.01f, 0.015f), k_ResetColor, "Reset", materials);
 
             // Shared with everyone in the session: one NetworkObject per exhibit, owned by one player at a time.
             if (!exhibitRoot.TryGetComponent<Unity.Netcode.NetworkObject>(out _))
@@ -333,18 +331,11 @@ namespace XRClassroom.EditorTools.Exhibits
             Set(guide, "m_ExhibitRoot", exhibitRoot);
             Set(guide, "m_Title", title);
             Set(guide, "m_Prompt", prompt);
-            Set(guide, "m_Choices", choices);
             Set(guide, "m_Feedback", feedback);
             Set(guide, "m_Hint", hint);
             Set(guide, "m_HintButton", hintButton);
             Set(guide, "m_NextButton", nextButton);
             Set(guide, "m_ResetButton", resetButton);
-            var serialized = new SerializedObject(guide);
-            var array = serialized.FindProperty("m_ChoiceButtons");
-            array.arraySize = choiceButtons.Length;
-            for (int i = 0; i < choiceButtons.Length; i++)
-                array.GetArrayElementAtIndex(i).objectReferenceValue = choiceButtons[i];
-            serialized.ApplyModifiedPropertiesWithoutUndo();
             return guide;
         }
 
@@ -569,10 +560,13 @@ namespace XRClassroom.EditorTools.Exhibits
             body.angularDamping = 1f;
             body.interpolation = RigidbodyInterpolation.Interpolate;
             body.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
-            body.isKinematic = locked;
+            // Always kinematic and moved straight to the hand: plugs never collide, so they can't snag on the
+            // bench, posts or bulbs. Their collider is only there so hands and rays can grab them.
+            body.isKinematic = true;
+            body.useGravity = false;
 
             var grab = go.AddComponent<XRGrabInteractable>();
-            grab.movementType = XRBaseInteractable.MovementType.VelocityTracking;
+            grab.movementType = XRBaseInteractable.MovementType.Instantaneous;
             grab.useDynamicAttach = true;
             grab.throwOnDetach = false;
 

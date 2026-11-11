@@ -79,12 +79,35 @@ namespace XRClassroom.Exhibits.Circuits
 
         void OnReleased(SelectExitEventArgs args)
         {
-            // Runs after the grab has restored the rigidbody, so this has the last word on kinematic state.
             var terminal = CircuitTerminal.FindNearestFree(transform.position, m_SnapRadius);
             if (terminal != null)
                 ClipOnto(terminal);
             else
-                m_Body.isKinematic = false;
+                DropToSurface();
+        }
+
+        /// <summary>
+        /// Plugs never collide with anything (they are kinematic and moved straight to the hand), so they cannot
+        /// snag on the bench, posts or bulbs. When let go away from a post, a plug drops straight down onto
+        /// whatever is below it and rests there upright.
+        /// </summary>
+        void DropToSurface()
+        {
+            m_Body.isKinematic = true;
+            var origin = transform.position + Vector3.up * 0.02f;
+            float nearest = float.MaxValue;
+            Vector3 point = transform.position;
+            foreach (var hit in Physics.RaycastAll(origin, Vector3.down, 2f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+            {
+                if (hit.collider.GetComponentInParent<WirePlug>() != null || hit.distance >= nearest)
+                    continue;
+                nearest = hit.distance;
+                point = hit.point;
+            }
+            var upright = Quaternion.Euler(0f, transform.eulerAngles.y, 0f);
+            m_Body.position = point;
+            m_Body.rotation = upright;
+            transform.SetPositionAndRotation(point, upright);
         }
 
         /// <summary>Clips this plug onto a post (also used by test hooks).</summary>
@@ -107,7 +130,6 @@ namespace XRClassroom.Exhibits.Circuits
                 return;
             attached.Detach(this);
             attached = null;
-            m_Body.isKinematic = m_Locked;
         }
     }
 }

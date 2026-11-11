@@ -121,16 +121,15 @@ namespace XRClassroom.Exhibits.PotatoBattery
                 m_LedBulb.sharedMaterial = on ? m_LedOnMaterial : m_LedOffMaterial;
             if (m_LedLight != null)
                 m_LedLight.enabled = on;
-
         }
 
-        /// <summary>What the circuit is doing right now, in plain words.</summary>
+        /// <summary>What the circuit is doing right now: a neutral observation, never the explanation.</summary>
         public string statusMessage => m_State switch
         {
-            State.NoneInserted => "Nothing lights yet: neither metal is in the potato.",
-            State.OneInserted => "One metal is in. The other one has to go in too, or there is no complete loop.",
-            State.Touching => "The metals are touching! Current takes the shortcut between them and skips the LED. Move them apart.",
-            _ => "The LED is on! Current flows from the copper (+), through the LED, to the zinc (-).",
+            State.NoneInserted => "The LED is off. Neither metal is in the potato.",
+            State.OneInserted => "The LED is off. One metal is in the potato.",
+            State.Touching => "The LED is off. The two metals are touching.",
+            _ => "The LED is on.",
         };
 
         void Start()
@@ -147,30 +146,24 @@ namespace XRClassroom.Exhibits.PotatoBattery
                 {
                     title = "A potato battery?",
                     prompt = "On the bench: a potato, a zinc nail and a copper strip, wired to a small light (an LED). " +
-                             "Can a potato make electricity?",
-                    choices = new[] { "Yes", "No", "Only a cooked one" },
-                    choiceFeedback = new[]
-                    {
-                        "Let's test it!",
-                        "Let's test it: you might be surprised!",
-                        "A raw one works fine. Let's test it!",
-                    },
-                    hint = "Batteries have two different metals and something wet between them. What do you have on the bench?",
+                             "What do you think will happen if you push both metals into the potato?",
+                    hint = "Think about what a battery is made of. Which of those things can you find on this bench?",
                 },
                 new GuideStep
                 {
-                    title = "Build the battery",
-                    prompt = "Grab the zinc nail and the copper strip by their clips and push their pointed ends into the potato.",
-                    hint = "Both metals have to be in the potato, a little apart. They must not touch each other.",
+                    title = "Try it",
+                    prompt = "Grab the zinc nail and the copper strip by their clips and push their pointed ends into the potato. " +
+                             "Watch the LED and the red spheres.",
+                    hint = "Hold a metal by its coloured clip and push the pointed end into the potato. Try it with both metals.",
                     isComplete = () => isComplete,
                     liveFeedback = () => statusMessage,
                 },
                 new GuideStep
                 {
-                    title = "How does it work?",
-                    prompt = "The zinc and copper react with the potato's juice. The zinc gives up charges and the copper takes " +
-                             "them in, so charges flow round the loop: the red spheres. Try pulling a metal out, or making them touch.",
-                    hint = "What happens to the spheres when the loop is broken? And when the metals touch inside the potato?",
+                    title = "What do you think?",
+                    prompt = "Why do you think the LED lit up? What do you think will happen if you pull one metal out, " +
+                             "or let the two metals touch? Try it and watch the red spheres.",
+                    hint = "Compare what the spheres do when the LED is on with what they do when it goes off.",
                     liveFeedback = () => statusMessage,
                 },
             };

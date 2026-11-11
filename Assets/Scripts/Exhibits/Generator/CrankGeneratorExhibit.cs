@@ -61,7 +61,6 @@ namespace XRClassroom.Exhibits.Generator
         float m_LastAngle;
         float m_Revolutions;
         float m_Output;
-        bool m_WasGenerating;
 
         /// <summary>Brightness of the bulb right now (0 = dark, 1 = full).</summary>
         public float output => m_Output;
@@ -93,8 +92,6 @@ namespace XRClassroom.Exhibits.Generator
             if (m_Output > 0.3f)
                 m_Revolutions += Mathf.Abs(angle - m_LastAngle) / 360f;
             m_LastAngle = angle;
-            if (m_Output > 0.3f)
-                m_WasGenerating = true;
 
             if (m_Magnet != null)
                 m_Magnet.localRotation = Quaternion.Euler(angle * m_GearRatio, 0f, 0f);
@@ -122,15 +119,14 @@ namespace XRClassroom.Exhibits.Generator
             }
         }
 
-        string TryItStatus()
+        /// <summary>A neutral observation of the bulb, never the explanation.</summary>
+        string BulbStatus()
         {
-            if (m_Output > 0.3f)
-                return "It glows! The faster you turn, the brighter the bulb.";
+            if (m_Output > 0.6f)
+                return "The bulb is glowing brightly.";
             if (m_Output > 0.02f)
-                return "A little faster! Turning slowly makes only a little electricity.";
-            if (m_WasGenerating && !m_Crank.isHeld)
-                return "You stopped turning, so the electricity stopped and the bulb went dark.";
-            return "Grab the knob and turn the crank in circles.";
+                return "The bulb is glowing dimly.";
+            return "The bulb is dark.";
         }
 
         List<GuideStep> BuildSteps()
@@ -139,59 +135,42 @@ namespace XRClassroom.Exhibits.Generator
             {
                 new GuideStep
                 {
-                    title = "What will happen?",
+                    title = "What do you think?",
                     prompt = "This crank is wired to a light bulb, but there is no battery anywhere. " +
-                             "What do you think happens if you turn the crank?",
-                    choices = new[] { "The bulb lights up", "Nothing happens", "It lights only while you turn" },
-                    choiceFeedback = new[]
-                    {
-                        "Let's test it. Watch what happens when you stop turning, too.",
-                        "Let's test it. You might be surprised!",
-                        "Good thinking! Let's test it.",
-                    },
-                    hint = "A bulb lights when charges flow through it. Could turning something make charges move?",
+                             "What do you think will happen if you turn the crank?",
+                    hint = "What does a bulb need in order to light up?",
                     onEnter = () =>
                     {
                         m_Revolutions = 0f;
-                        m_WasGenerating = false;
                     },
                 },
                 new GuideStep
                 {
                     title = "Try it",
-                    prompt = "Grab the knob on the crank and turn it in circles. Try slowly, then fast. Then let go and watch the bulb.",
+                    prompt = "Grab the knob and turn the crank. Try slowly, then quickly, then let go. What changes?",
                     hint = "Hold the knob and make big circles around the axle, like pedalling a bike with your hand.",
                     onEnter = () =>
                     {
                         m_Revolutions = 0f;
-                        m_WasGenerating = false;
                     },
                     isComplete = () => m_Revolutions >= 3f,
-                    liveFeedback = TryItStatus,
+                    liveFeedback = BulbStatus,
                 },
                 new GuideStep
                 {
                     title = "Where does it come from?",
-                    prompt = "The bulb only glows while you turn the crank. So where does its electricity come from?",
-                    choices = new[] { "A hidden battery", "Your arm turning the crank", "The bulb makes it" },
-                    choiceFeedback = new[]
-                    {
-                        "There's no battery. A battery would keep the bulb lit after you stopped turning.",
-                        "Yes! The energy comes from you: the machine turns the motion of your arm into electricity.",
-                        "A bulb can't make its own electricity: it went dark as soon as you stopped turning.",
-                    },
-                    hint = "What did you have to keep doing to keep the bulb lit? Where did that effort go?",
+                    prompt = "There is still no battery. Where do you think the bulb's electricity comes from?",
+                    hint = "What did you have to keep doing to keep the bulb lit? What happened when you stopped?",
+                    liveFeedback = BulbStatus,
                 },
                 new GuideStep
                 {
                     title = "Look inside",
-                    prompt = "The box is open! The crank spins a MAGNET between two COILS of copper wire. A moving " +
-                             "magnet pushes the charges in the wire along: that's electricity. Turn the crank and follow the sign.",
-                    hint = "Watch the red spheres: they only move while the magnet spins. No motion, no electricity. Try turning the other way, too.",
+                    prompt = "The box is open. What do you see inside? Turn the crank and watch closely. " +
+                             "How do you think the parts inside make the bulb glow?",
+                    hint = "Watch the red spheres and the parts that move. When do the spheres move, and when do they stop?",
                     onEnter = () => SetRevealed(true),
-                    liveFeedback = () => m_Output > 0.02f
-                        ? "Your arm (mechanical energy) spins the magnet. That pushes charges round the wire (electrical energy), and the bulb turns it into light."
-                        : "Turn the crank and watch the magnet spin past the coils.",
+                    liveFeedback = BulbStatus,
                 },
             };
         }
@@ -199,10 +178,6 @@ namespace XRClassroom.Exhibits.Generator
         /// <summary>For testing without a headset: turns the crank at 1.5 turns per second for ten seconds.</summary>
         [ContextMenu("Test: Turn Crank")]
         public void TestTurnCrank() => m_Crank.Spin(1.5f);
-
-        /// <summary>For testing without a headset: answers the current question with choice B.</summary>
-        [ContextMenu("Test: Answer B")]
-        public void TestAnswerB() => m_Guide.Answer(1);
 
         /// <summary>For testing without a headset: presses Next.</summary>
         [ContextMenu("Test: Next")]

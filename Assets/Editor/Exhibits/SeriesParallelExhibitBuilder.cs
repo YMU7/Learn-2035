@@ -7,14 +7,15 @@ using static XRClassroom.EditorTools.Exhibits.ExhibitBuilderUtility;
 namespace XRClassroom.EditorTools.Exhibits
 {
     /// <summary>
-    /// Builds the series vs. parallel exhibit: a wiring board at the front (battery, two bulbs, five loose
-    /// wires) and, at the back, two pairs of example circuits (A and B) for the "which one is correct?"
-    /// questions. Rebuilding keeps the exhibit's position and billboard slides.
+    /// Builds the series vs. parallel exhibit: one wiring board with a SERIES side and a PARALLEL side (each a
+    /// battery and two bulbs) and eight loose wires along its front edge, so students can wire both and compare
+    /// them side by side. Rebuilding keeps the exhibit's position and billboard slides.
     /// </summary>
     static class SeriesParallelExhibitBuilder
     {
         const string k_RootName = "SeriesParallelExhibit";
-        const float k_FreeWireLength = 0.45f;
+        const float k_WireLength = 0.45f;
+        const int k_WireCount = 8;
 
         [MenuItem("XR Classroom/Exhibits/Build Series vs Parallel Exhibit")]
         static void BuildMenu() => Build(useDefaultPose: false);
@@ -39,121 +40,72 @@ namespace XRClassroom.EditorTools.Exhibits
             var experiment = ExhibitFrame(root, materials);
             var guide = Guide(experiment, root, materials);
 
-            // Front: the board the student wires up.
-            var freeBoard = Board(experiment, "Wiring Board", new Vector3(0f, 0f, -0.06f), new Vector3(0.8f, 0.01f, 0.3f), materials,
-                root, locked: false, out var battery, out var bulbs);
+            // One board across the bench: series side on the left, parallel side on the right.
+            var board = Empty("Wiring Board", experiment, new Vector3(0f, 0f, -0.03f));
+            var t = board.transform;
+            const float top = 0.01f;
+            Primitive(PrimitiveType.Cube, "Base", t, new Vector3(0f, top * 0.5f, 0f), new Vector3(1.24f, top, 0.44f), materials.board);
+            Primitive(PrimitiveType.Cube, "Divider", t, new Vector3(0f, top + 0.0005f, 0f), new Vector3(0.006f, 0.001f, 0.42f),
+                materials.darkPlastic, keepCollider: false);
+
             var flat = Quaternion.Euler(90f, 0f, 0f);
-            Label("Bulb 1 Label", freeBoard.transform, new Vector3(0.02f, 0.0105f, -0.06f), flat, "Bulb 1", 0.18f, new Vector2(0.1f, 0.025f), TextColor);
-            Label("Bulb 2 Label", freeBoard.transform, new Vector3(0.24f, 0.0105f, -0.06f), flat, "Bulb 2", 0.18f, new Vector2(0.1f, 0.025f), TextColor);
-            Label("Battery Label", freeBoard.transform, new Vector3(-0.25f, 0.0105f, -0.06f), flat, "Battery", 0.18f, new Vector2(0.1f, 0.025f), TextColor);
+            var sectionColor = new Color(0.1f, 0.3f, 0.7f);
+            Label("Series Title", t, new Vector3(-0.31f, top + 0.001f, 0.18f), flat, "SERIES", 0.45f, new Vector2(0.5f, 0.06f), sectionColor)
+                .fontStyle = TMPro.FontStyles.Bold;
+            Label("Parallel Title", t, new Vector3(0.31f, top + 0.001f, 0.18f), flat, "PARALLEL", 0.45f, new Vector2(0.5f, 0.06f), sectionColor)
+                .fontStyle = TMPro.FontStyles.Bold;
 
-            // Five loose wires lying side by side along the board's front edge, ready to be picked up.
-            var wires = new CircuitWireLink[5];
-            for (int i = 0; i < wires.Length; i++)
+            var seriesBattery = Battery(t, "Series Battery", new Vector3(-0.31f, top, -0.08f), materials,
+                out var seriesMinus, out var seriesPlus, out var seriesPath);
+            var parallelBattery = Battery(t, "Parallel Battery", new Vector3(0.31f, top, -0.08f), materials,
+                out var parallelMinus, out var parallelPlus, out var parallelPath);
+            var s1 = Bulb(t, "Series Bulb 1", new Vector3(-0.46f, top, 0.08f), materials);
+            var s2 = Bulb(t, "Series Bulb 2", new Vector3(-0.16f, top, 0.08f), materials);
+            var p1 = Bulb(t, "Parallel Bulb 1", new Vector3(0.16f, top, 0.08f), materials);
+            var p2 = Bulb(t, "Parallel Bulb 2", new Vector3(0.46f, top, 0.08f), materials);
+            foreach (var (bulb, text) in new[] { (s1, "1"), (s2, "2"), (p1, "1"), (p2, "2") })
+                Label($"{bulb.name} Label", t, bulb.transform.localPosition + new Vector3(0f, 0.001f, -0.045f), flat, $"Bulb {text}", 0.18f,
+                    new Vector2(0.1f, 0.025f), TextColor);
+            var seriesFlow = Flow(seriesBattery.transform, "Current", false, materials, diameter: 0.008f, spacing: 0.02f);
+            var parallelFlow = Flow(parallelBattery.transform, "Current", false, materials, diameter: 0.008f, spacing: 0.02f);
+
+            // Loose wires lying along the board's front edge, ready to be picked up.
+            var wires = new CircuitWireLink[k_WireCount];
+            for (int i = 0; i < k_WireCount; i++)
             {
-                float x = -0.3f + 0.15f * i;
-                wires[i] = WireLink(experiment, $"Wire {i + 1}", new Vector3(x - 0.045f, 0.01f, -0.17f), new Vector3(x + 0.045f, 0.01f, -0.17f),
-                    k_FreeWireLength, materials.wireColors[i], root, experiment, materials);
+                float x = -0.525f + 0.15f * i;
+                wires[i] = WireLink(experiment, $"Wire {i + 1}", new Vector3(x - 0.045f, top, -0.22f), new Vector3(x + 0.045f, top, -0.22f),
+                    k_WireLength, materials.wireColors[i % materials.wireColors.Length], root, experiment, materials);
             }
-            SetArray(freeBoard, "m_Wires", wires);
 
-            // Back: the example circuits, two at a time.
-            var seriesExamples = Empty("Series Examples", experiment, Vector3.zero);
-            var seriesA = ExampleBoard(seriesExamples.transform, "Series A", -0.36f, materials, root, experiment, ExampleKind.SeriesBackToStart);
-            var seriesB = ExampleBoard(seriesExamples.transform, "Series B", 0.36f, materials, root, experiment, ExampleKind.Series);
-            var parallelExamples = Empty("Parallel Examples", experiment, Vector3.zero);
-            var parallelA = ExampleBoard(parallelExamples.transform, "Parallel A", -0.36f, materials, root, experiment, ExampleKind.Parallel);
-            var parallelB = ExampleBoard(parallelExamples.transform, "Parallel B", 0.36f, materials, root, experiment, ExampleKind.ParallelShorted);
-            parallelExamples.SetActive(false);
+            var circuit = board.AddComponent<CircuitBoard>();
+            var serialized = new SerializedObject(circuit);
+            var batteries = serialized.FindProperty("m_Batteries");
+            batteries.arraySize = 2;
+            SetBattery(batteries.GetArrayElementAtIndex(0), seriesPlus, seriesMinus, seriesPath, seriesFlow);
+            SetBattery(batteries.GetArrayElementAtIndex(1), parallelPlus, parallelMinus, parallelPath, parallelFlow);
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+            SetArray(circuit, "m_Bulbs", new Object[] { s1, s2, p1, p2 });
+            SetArray(circuit, "m_Wires", wires);
 
             var exhibit = experiment.gameObject.AddComponent<SeriesParallelExhibit>();
             Set(exhibit, "m_Guide", guide);
-            Set(exhibit, "m_FreeBoard", freeBoard);
-            Set(exhibit, "m_SeriesExamples", seriesExamples);
-            Set(exhibit, "m_SeriesA", seriesA);
-            Set(exhibit, "m_SeriesB", seriesB);
-            Set(exhibit, "m_ParallelExamples", parallelExamples);
-            Set(exhibit, "m_ParallelA", parallelA);
-            Set(exhibit, "m_ParallelB", parallelB);
+            Set(exhibit, "m_Board", circuit);
+            Set(exhibit, "m_SeriesBulb1", s1);
+            Set(exhibit, "m_SeriesBulb2", s2);
+            Set(exhibit, "m_ParallelBulb1", p1);
+            Set(exhibit, "m_ParallelBulb2", p2);
         }
 
-        /// <summary>A board with a battery on the left and two bulbs to its right.</summary>
-        static CircuitBoard Board(Transform parent, string name, Vector3 position, Vector3 size, SharedMaterials materials,
-            Transform exhibitRoot, bool locked, out GameObject battery, out LightBulb[] bulbs)
+        static void SetBattery(SerializedProperty element, CircuitTerminal plus, CircuitTerminal minus, Transform[] path, CurrentFlowVisualizer flow)
         {
-            var board = Empty(name, parent, position);
-            var t = board.transform;
-            Primitive(PrimitiveType.Cube, "Base", t, new Vector3(0f, size.y * 0.5f, 0f), size, materials.board);
-
-            float top = size.y;
-            float scale = size.x / 0.8f; // Example boards are narrower: pieces sit closer together.
-            battery = Battery(t, "Battery", new Vector3(-0.25f * scale, top, 0.01f), materials,
-                out var negative, out var positive, out var internalPath, acceptsLoosePlugs: !locked);
-            bulbs = new[]
-            {
-                Bulb(t, "Bulb 1", new Vector3(0.02f * scale, top, 0.05f), materials, acceptsLoosePlugs: !locked),
-                Bulb(t, "Bulb 2", new Vector3(0.24f * scale, top, 0.05f), materials, acceptsLoosePlugs: !locked),
-            };
-            var batteryFlow = Flow(battery.transform, "Current", false, materials, diameter: 0.008f, spacing: 0.02f);
-
-            var circuit = board.AddComponent<CircuitBoard>();
-            Set(circuit, "m_BatteryPositive", positive);
-            Set(circuit, "m_BatteryNegative", negative);
-            SetArray(circuit, "m_BatteryPath", internalPath);
-            Set(circuit, "m_BatteryFlow", batteryFlow);
-            SetArray(circuit, "m_Bulbs", bulbs);
-            return circuit;
-        }
-
-        enum ExampleKind
-        {
-            /// <summary>Wrong: the loop comes back to the + post it started from, so nothing lights.</summary>
-            SeriesBackToStart,
-            /// <summary>Right: one loop through both bulbs.</summary>
-            Series,
-            /// <summary>Right: each bulb has its own path.</summary>
-            Parallel,
-            /// <summary>Wrong: parallel, plus a wire straight from + to - (a short circuit).</summary>
-            ParallelShorted,
-        }
-
-        /// <summary>A pre-wired, unpowered example circuit with a big A or B beside it.</summary>
-        static CircuitBoard ExampleBoard(Transform parent, string name, float x, SharedMaterials materials, Transform exhibitRoot,
-            Transform restSurface, ExampleKind kind)
-        {
-            var board = Board(parent, name, new Vector3(x, 0f, 0.2f), new Vector3(0.44f, 0.008f, 0.16f), materials, exhibitRoot,
-                locked: true, out _, out var bulbs);
-            var serialized = new SerializedObject(board);
-            var plus = (CircuitTerminal)serialized.FindProperty("m_BatteryPositive").objectReferenceValue;
-            var minus = (CircuitTerminal)serialized.FindProperty("m_BatteryNegative").objectReferenceValue;
-            var b1 = bulbs[0];
-            var b2 = bulbs[1];
-
-            (CircuitTerminal from, CircuitTerminal to)[] connections = kind switch
-            {
-                ExampleKind.SeriesBackToStart => new[] { (plus, b1.terminalA), (b1.terminalB, b2.terminalA), (b2.terminalB, plus) },
-                ExampleKind.Series => new[] { (plus, b1.terminalA), (b1.terminalB, b2.terminalA), (b2.terminalB, minus) },
-                ExampleKind.Parallel => new[] { (plus, b1.terminalA), (b1.terminalA, b2.terminalA), (b1.terminalB, minus), (b2.terminalB, b1.terminalB) },
-                _ => new[] { (plus, b1.terminalA), (b1.terminalA, b2.terminalA), (b1.terminalB, minus), (b2.terminalB, b1.terminalB), (plus, minus) },
-            };
-
-            var wires = new CircuitWireLink[connections.Length];
-            for (int i = 0; i < connections.Length; i++)
-            {
-                var (from, to) = connections[i];
-                float length = Vector3.Distance(from.transform.position, to.transform.position) * 1.25f + 0.02f;
-                var material = from == plus && to == minus ? materials.wireRed : materials.wireColors[i % materials.wireColors.Length];
-                wires[i] = WireLink(board.transform, $"Wire {i + 1}", Vector3.zero, Vector3.zero, length, material, exhibitRoot,
-                    restSurface, materials, from, to, locked: true);
-            }
-            SetArray(board, "m_Wires", wires);
-            Set(board, "m_Powered", false);
-
-            string letter = name.EndsWith("A") ? "A" : "B";
-            var label = Label($"{name} Letter", board.transform, new Vector3(-0.19f, 0.0085f, -0.055f), Quaternion.Euler(90f, 0f, 0f),
-                letter, 0.7f, new Vector2(0.06f, 0.06f), new Color(0.1f, 0.3f, 0.7f));
-            label.fontStyle = TMPro.FontStyles.Bold;
-            return board;
+            element.FindPropertyRelative("positive").objectReferenceValue = plus;
+            element.FindPropertyRelative("negative").objectReferenceValue = minus;
+            element.FindPropertyRelative("flow").objectReferenceValue = flow;
+            var points = element.FindPropertyRelative("path");
+            points.arraySize = path.Length;
+            for (int i = 0; i < path.Length; i++)
+                points.GetArrayElementAtIndex(i).objectReferenceValue = path[i];
         }
     }
 }

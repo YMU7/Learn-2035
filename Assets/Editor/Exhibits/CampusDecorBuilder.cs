@@ -47,6 +47,56 @@ namespace XRClassroom.EditorTools.Exhibits
             Finish(root);
         }
 
+        // In the open lawn in front of the hand crank lab, facing it.
+        static readonly Vector3[] k_BenchPositions = { new Vector3(17.5f, 0f, 4.4f), new Vector3(20.3f, 0f, 4.4f) };
+
+        [MenuItem("XR Classroom/Environment/Build Benches")]
+        static void BuildBenches()
+        {
+            if (!CheckDemoSceneIsActive("build the benches"))
+                return;
+            var existing = FindInScene("Benches");
+            if (existing != null)
+                Undo.DestroyObjectImmediate(existing.gameObject);
+            var root = new GameObject("Benches").transform;
+            var wood = LitMaterial($"{k_Folder}/Materials/BenchWood.mat", new Color(0.62f, 0.42f, 0.25f), smoothness: 0.25f);
+            var frame = LitMaterial($"{k_Folder}/Materials/BenchFrame.mat", new Color(0.18f, 0.2f, 0.22f), metallic: 0.5f, smoothness: 0.4f);
+            for (int i = 0; i < k_BenchPositions.Length; i++)
+            {
+                var position = k_BenchPositions[i];
+                if (LowPolyMeshes.VisibleGroundHeight(position, out float ground))
+                    position.y = ground;
+                // Built facing local -z; turned around so people sitting on it face the lab to the north.
+                var bench = Empty($"Bench {i + 1}", root, position, Quaternion.Euler(0f, 180f, 0f)).transform;
+                Bench(bench, wood, frame);
+            }
+            Finish(root);
+        }
+
+        /// <summary>A 1.6 m park bench: three seat slats, two back slats, dark metal side frames and armrests.</summary>
+        static void Bench(Transform bench, Material wood, Material frame)
+        {
+            for (int i = 0; i < 3; i++)
+                Part(PrimitiveType.Cube, "Seat Slat", bench, new Vector3(0f, 0.45f, -0.14f + 0.13f * i), new Vector3(1.6f, 0.04f, 0.11f), wood);
+            for (int i = 0; i < 2; i++)
+                Part(PrimitiveType.Cube, "Back Slat", bench, new Vector3(0f, 0.62f + 0.16f * i, 0.23f + 0.02f * i), new Vector3(1.6f, 0.1f, 0.035f), wood,
+                    new Vector3(-10f, 0f, 0f));
+            for (int side = -1; side <= 1; side += 2)
+            {
+                float x = 0.72f * side;
+                Part(PrimitiveType.Cube, "Front Leg", bench, new Vector3(x, 0.225f, -0.17f), new Vector3(0.06f, 0.45f, 0.06f), frame);
+                Part(PrimitiveType.Cube, "Back Leg", bench, new Vector3(x, 0.44f, 0.22f), new Vector3(0.06f, 0.88f, 0.06f), frame, new Vector3(-6f, 0f, 0f));
+                Part(PrimitiveType.Cube, "Seat Rail", bench, new Vector3(x, 0.415f, 0.02f), new Vector3(0.05f, 0.04f, 0.46f), frame);
+                Part(PrimitiveType.Cube, "Armrest", bench, new Vector3(x, 0.66f, 0f), new Vector3(0.07f, 0.04f, 0.45f), frame);
+                Part(PrimitiveType.Cube, "Arm Post", bench, new Vector3(x, 0.55f, -0.17f), new Vector3(0.05f, 0.2f, 0.05f), frame);
+            }
+            // One box so players and the tree ring treat the bench as solid.
+            var collider = bench.gameObject.AddComponent<BoxCollider>();
+            collider.center = new Vector3(0f, 0.45f, 0.03f);
+            collider.size = new Vector3(1.65f, 0.9f, 0.5f);
+        }
+
+        [MenuItem("XR Classroom/Environment/Build Benches", true)]
         [MenuItem("XR Classroom/Environment/Build Potato Truck", true)]
         [MenuItem("XR Classroom/Environment/Build Festival Entrance", true)]
         static bool CanBuild() => !EditorApplication.isPlayingOrWillChangePlaymode;
