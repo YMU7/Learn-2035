@@ -28,6 +28,9 @@ namespace XRClassroom.Exhibits
         /// <summary>Raised just before the piece is moved back, e.g. so it can release joints.</summary>
         public event Action resetting;
 
+        /// <summary>Raised right after the piece is back at its start pose, e.g. so a plug can clip back on.</summary>
+        public event Action resetCompleted;
+
         /// <summary>The exhibit this piece belongs to.</summary>
         public Transform exhibitRoot
         {
@@ -92,6 +95,7 @@ namespace XRClassroom.Exhibits
                 m_Body.rotation = rotation;
             }
             transform.SetPositionAndRotation(position, rotation);
+            resetCompleted?.Invoke();
         }
     }
 }

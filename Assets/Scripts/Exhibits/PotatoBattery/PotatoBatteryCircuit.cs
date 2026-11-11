@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
 
@@ -44,7 +43,9 @@ namespace XRClassroom.Exhibits.PotatoBattery
 
         [Header("Feedback")]
         [SerializeField] CurrentFlowVisualizer m_CurrentFlow;
-        [SerializeField] TMP_Text m_StatusText;
+
+        [SerializeField, Tooltip("Runs the exhibit's steps on the backsplash and its Hint / Next / Reset buttons.")]
+        ExhibitGuide m_Guide;
 
         [SerializeField, Tooltip("The metals short out if their tips are closer than this (m).")]
         float m_MinElectrodeGap = 0.02f;
@@ -121,16 +122,58 @@ namespace XRClassroom.Exhibits.PotatoBattery
             if (m_LedLight != null)
                 m_LedLight.enabled = on;
 
-            if (m_StatusText != null)
+        }
+
+        /// <summary>What the circuit is doing right now, in plain words.</summary>
+        public string statusMessage => m_State switch
+        {
+            State.NoneInserted => "Nothing lights yet: neither metal is in the potato.",
+            State.OneInserted => "One metal is in. The other one has to go in too, or there is no complete loop.",
+            State.Touching => "The metals are touching! Current takes the shortcut between them and skips the LED. Move them apart.",
+            _ => "The LED is on! Current flows from the copper (+), through the LED, to the zinc (-).",
+        };
+
+        void Start()
+        {
+            if (m_Guide != null)
+                m_Guide.SetSteps(BuildSteps());
+        }
+
+        List<GuideStep> BuildSteps()
+        {
+            return new List<GuideStep>
             {
-                m_StatusText.text = m_State switch
+                new GuideStep
                 {
-                    State.NoneInserted => "Push the zinc and the copper into the potato.",
-                    State.OneInserted => "One metal is in. Now push in the other one.",
-                    State.Touching => "The metals are touching! Move them apart.",
-                    _ => "Circuit complete! Current flows from copper (+)\nthrough the LED to zinc (-).",
-                };
-            }
+                    title = "A potato battery?",
+                    prompt = "On the bench: a potato, a zinc nail and a copper strip, wired to a small light (an LED). " +
+                             "Can a potato make electricity?",
+                    choices = new[] { "Yes", "No", "Only a cooked one" },
+                    choiceFeedback = new[]
+                    {
+                        "Let's test it!",
+                        "Let's test it: you might be surprised!",
+                        "A raw one works fine. Let's test it!",
+                    },
+                    hint = "Batteries have two different metals and something wet between them. What do you have on the bench?",
+                },
+                new GuideStep
+                {
+                    title = "Build the battery",
+                    prompt = "Grab the zinc nail and the copper strip by their clips and push their pointed ends into the potato.",
+                    hint = "Both metals have to be in the potato, a little apart. They must not touch each other.",
+                    isComplete = () => isComplete,
+                    liveFeedback = () => statusMessage,
+                },
+                new GuideStep
+                {
+                    title = "How does it work?",
+                    prompt = "The zinc and copper react with the potato's juice. The zinc gives up charges and the copper takes " +
+                             "them in, so charges flow round the loop: the red spheres. Try pulling a metal out, or making them touch.",
+                    hint = "What happens to the spheres when the loop is broken? And when the metals touch inside the potato?",
+                    liveFeedback = () => statusMessage,
+                },
+            };
         }
 
         /// <summary>The whole loop in the direction of conventional current, starting at the copper clip.</summary>

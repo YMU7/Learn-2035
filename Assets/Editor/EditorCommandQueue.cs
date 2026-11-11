@@ -25,6 +25,7 @@ namespace XRClassroom.EditorTools
     ///   screenshot px py pz tx ty tz [fov] [file]   render from p looking at t into a PNG
     ///   raycast x z                          report every collider straight down at (x, z)
     ///   call ObjectName ComponentType Method call a public parameterless method (works in Play mode)
+    ///   delete-asset Assets/Path/File.ext    delete an asset and its .meta through the AssetDatabase
     /// Commands other than "play" also run while in Play mode.
     /// </summary>
     [InitializeOnLoad]
@@ -169,6 +170,14 @@ namespace XRClassroom.EditorTools
                     CallMethod(argument);
                     break;
 
+                case "delete-asset":
+                    // Deletes an asset and its .meta through the AssetDatabase (never by hand).
+                    if (AssetDatabase.DeleteAsset(argument))
+                        Report($"delete-asset: deleted {argument}");
+                    else
+                        Report($"delete-asset: could not delete {argument}", true);
+                    break;
+
                 case "play":
                     if (EditorApplication.isPlaying)
                     {
@@ -237,6 +246,8 @@ namespace XRClassroom.EditorTools
                     if (material != null)
                         bounds += $" mat={material.name}" + (material.HasColor("_BaseColor") ? $" color={material.GetColor("_BaseColor")}" : "");
                 }
+                if (go.TryGetComponent(out UnityEngine.XR.Interaction.Toolkit.Interactors.NearFarInteractor nearFar))
+                    bounds += $" ui={nearFar.enableUIInteraction} far={nearFar.enableFarCasting} activate={nearFar.activateInput?.inputSourceMode} uiPress={nearFar.uiPressInput?.inputSourceMode}";
                 builder.AppendLine(
                     $"{new string(' ', depth * 2)}{(go.activeSelf ? "" : "[off] ")}{go.name} " +
                     $"pos={t.position:F2} rot={t.eulerAngles:F0} scale={t.lossyScale:F2} layer={LayerMask.LayerToName(go.layer)}" +

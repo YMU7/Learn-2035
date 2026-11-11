@@ -13,13 +13,16 @@ namespace XRClassroom.EditorTools.Exhibits
     /// the white lab bench and the blank billboards. Every exhibit uses the same scale:
     /// 1 unit = 1 m, matching the avatar and XR rig, with the bench top at hand height.
     /// </summary>
-    static class ExhibitBuilderUtility
+    static partial class ExhibitBuilderUtility
     {
         public const string DemoScenePath = "Assets/Scenes/DemoClass.unity";
         public const string SharedMaterialFolder = "Assets/Exhibits/Shared/Materials";
 
         /// <summary>Bench top height (m). Standing adults reach it comfortably with relaxed arms.</summary>
         public const float BenchTopHeight = 0.9f;
+
+        /// <summary>Height (m) of the backsplash above the bench top. It holds the step guide text.</summary>
+        public const float BacksplashHeight = 0.6f;
 
         /// <summary>Exhibits are only built into the DemoClass scene. Logs an error and returns false otherwise.</summary>
         public static bool CheckDemoSceneIsActive(string action)
@@ -166,8 +169,8 @@ namespace XRClassroom.EditorTools.Exhibits
 
             Primitive(PrimitiveType.Cube, "Front Skirt", t, new Vector3(0f, top - topThickness - 0.04f, -depth * 0.5f + 0.01f),
                 new Vector3(width, 0.08f, 0.02f), material);
-            Primitive(PrimitiveType.Cube, "Backsplash", t, new Vector3(0f, top + 0.225f, depth * 0.5f - 0.01f),
-                new Vector3(width, 0.45f, 0.02f), material);
+            Primitive(PrimitiveType.Cube, "Backsplash", t, new Vector3(0f, top + BacksplashHeight * 0.5f, depth * 0.5f - 0.01f),
+                new Vector3(width, BacksplashHeight, 0.02f), material);
             return bench;
         }
 
